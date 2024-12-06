@@ -11,16 +11,16 @@ Usage: ldapuser [cmd]
 
 where cmd is
 
-help This help
-addgroup Add group to LDAP (requires LDAP admin password)
-adduser Add user to LDAP (requires LDAP admin password)
-addusergroup Add user to group in LDAP (requires LDAP admin password)
-chsh Change login shell
-delgroup Delete group from LDAP (requires LDAP admin password)
-deluser Delete user from LDAP (requires LDAP admin password)
-delusergroup Remove user from group in LDAP (requires LDAP admin password)
-fullname Change fullname
-passwd Change password
+help               This help
+addgroup           Add group to LDAP (requires LDAP admin password)
+adduser            Add user to LDAP (requires LDAP admin password)
+addusergroup       Add user to group in LDAP (requires LDAP admin password)
+chsh               Change login shell
+delgroup           Delete group from LDAP (requires LDAP admin password)
+deluser            Delete user from LDAP (requires LDAP admin password)
+delusergroup       Remove user from group in LDAP (requires LDAP admin password)
+fullname           Change fullname
+passwd             Change password
 ```
 
 ## Add user

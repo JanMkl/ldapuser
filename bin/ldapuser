@@ -1,0 +1,245 @@
+#!/bin/sh
+
+# Copyright (c) 2024, Jan Melen
+# Please see detailed copyright in the LICENSE file
+
+#
+## Set environment
+PROG=`basename $0`
+DOMDN="dc=example,dc=org"
+PEOPLEDN="ou=people,$DOMDN"
+GROUPDN="ou=group,$DOMDN"
+USERDN="uid=$USER,$PEOPLEDN"
+MANAGERDN="cn=Manager,$DOMDN"
+
+usage() {
+    cat <<EOF
+Usage: $PROG [cmd]
+
+where cmd is
+
+help               This help
+addgroup           Add group to LDAP (requires LDAP admin password)
+adduser            Add user to LDAP (requires LDAP admin password)
+addusergroup       Add user to group in LDAP (requires LDAP admin password)
+chsh               Change login shell
+delgroup           Delete group from LDAP (requires LDAP admin password)
+deluser            Delete user from LDAP (requires LDAP admin password)
+delusergroup       Remove user from group in LDAP (requires LDAP admin password)
+fullname           Change fullname
+passwd             Change password
+
+EOF
+   exit 1
+}
+
+chsh(){
+    ldif="/tmp/ldap_modify_$$.ldif"
+
+    echo "Valid shells are:"
+    cat /etc/shells | grep -v -e '^$' -e '^#' 
+    echo ""
+    read -p "New Shell: " nsh;
+    grep -Fxq $nsh /etc/shells || exit 1
+
+    cat > $ldif <<EOF
+dn: $USERDN
+changetype: modify
+replace: loginShell
+loginShell: $nsh
+EOF
+
+    ldapmodify -ZZ -D $USERDN -W < $ldif
+    rm $ldif
+}
+
+fullname() {
+    ldif="/tmp/ldap_modify_$$.ldif"
+    read -p "Firstname: " nfn;
+    read -p "Surname: " nsn;
+
+    cat > $ldif <<EOF
+dn: $USERDN
+changetype: modify
+replace: cn
+cn: $nfn $nsn
+-
+replace: gecos
+gecos: $nfn $nsn
+-
+replace: sn
+sn: $nsn
+EOF
+
+    ldapmodify -ZZ -D $USERDN -W < $ldif
+    rm $ldif
+}
+
+passwd() {
+    ldappasswd -ZZ -D $USERDN -W -S
+}
+
+adduser() {
+    ldif="/tmp/ldap_add_$$.ldif"
+    read -p "Username: " nuser;
+    read -p "Firstname: " nfn;
+    read -p "Surname: " nsn;
+    read -p "UID: " nuid;
+    read -p "GID: " ngid;
+    read -p "Shell: " nsh;
+    read -p "Home directory: " nhome;
+    stty -echo
+    read -p "Password: " np1; echo
+    read -p "Retype Password: " np2; echo
+    stty echo
+
+    if [ "$np1" != "$np2" ]; then
+        echo "Passwords do not match."
+        exit 1
+    fi
+
+    salt=`head -c 4 /dev/random`
+    ssha=`echo -n "${np1}${salt}" | openssl dgst -binary -sha1`
+    encpw=`echo -n "${ssha}${salt}" | openssl enc -base64`
+
+    cat > $ldif <<EOF
+dn: uid=$nuser,$PEOPLEDN
+objectClass: person
+objectClass: posixAccount
+objectClass: shadowAccount
+sn: $nsn
+cn: $nfn $nsn
+uid: $nuser
+uidNumber: $nuid
+gidNumber: $ngid
+homeDirectory: $nhome
+loginShell: $nsh
+userPassword: {SSHA}$encpw
+gecos: $nfn $nsn
+
+dn: cn=$nuser,$GROUPDN
+objectClass: posixGroup
+gidNumber: $nuid
+cn: $nuser
+memberUID: $nuser
+
+EOF
+
+    ldapadd -ZZ -D $MANAGERDN -W < $ldif
+    rm $ldif
+}
+
+deluser() {
+    ldif="/tmp/ldap_del_$$.ldif"
+    read -p "Username: " nuser;
+
+    cat > $ldif <<EOF
+dn: cn=$nuser,$GROUPDN
+changetype: delete
+
+dn: uid=$nuser,$PEOPLEDN
+changetype: delete
+EOF
+
+    ldapmodify -ZZ -D $MANAGERDN -W < $ldif
+    rm $ldif
+}
+
+addusergroup() {
+    ldif="/tmp/ldap_add_$$.ldif"
+    read -p "Username: " nuser;
+    read -p "Groupname: " ngroup;
+
+    cat > $ldif <<EOF
+dn: cn=$ngroup,$GROUPDN
+changetype: modify
+add: memberUID
+memberUID: $nuser
+EOF
+
+    ldapmodify -ZZ -D $MANAGERDN -W < $ldif
+    rm $ldif
+}
+
+delusergroup() {
+    ldif="/tmp/ldap_del_$$.ldif"
+    read -p "Username: " nuser;
+    read -p "Groupname: " ngroup;
+
+    cat > $ldif <<EOF
+dn: cn=$ngroup,$GROUPDN
+changetype: modify
+delete: memberUID
+memberUID: $nuser
+EOF
+
+    ldapmodify -ZZ -D $MANAGERDN -W < $ldif
+    rm $ldif
+}
+
+addgroup() {
+    ldif="/tmp/ldap_add_$$.ldif"
+    read -p "Groupname: " ngroup;
+    read -p "GID: " ngid;
+
+    cat > $ldif <<EOF
+dn: cn=$ngroup,$GROUPDN
+objectClass: posixGroup
+gidNumber: $ngid
+cn: $ngroup
+EOF
+
+    ldapadd -ZZ -D $MANAGERDN -W < $ldif
+    rm $ldif
+}
+
+delgroup() {
+    ldif="/tmp/ldap_del_$$.ldif"
+    read -p "Groupname: " ngroup;
+
+    cat > $ldif <<EOF
+dn: cn=$ngroup,$GROUPDN
+changetype: delete
+EOF
+
+    ldapmodify -ZZ -D $MANAGERDN -W < $ldif
+    rm $ldif
+}
+
+case "${1}" in
+    addgroup)
+        addgroup
+        ;;
+    adduser)
+        adduser
+        ;;
+    addusergroup)
+        addusergroup
+        ;;
+    chsh)
+        chsh
+        ;;
+    delgroup)
+        delgroup
+        ;;
+    deluser)
+        deluser
+        ;;
+    delusergroup)
+        delusergroup
+        ;;
+    fullname)
+        fullname
+        ;;
+    passwd)
+        passwd
+        ;;
+    help)
+        usage
+        ;;
+    *)
+        echo "${1}: Invalid command"
+        usage
+        ;;
+esac
+exit 0

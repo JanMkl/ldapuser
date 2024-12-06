@@ -6,7 +6,8 @@ To get started change the DOMDN to match with your domain. By default the user O
 
 Execute ldapuser help
 
-`Usage: ldapuser [cmd]
+```
+Usage: ldapuser [cmd]
 
 where cmd is
 
@@ -19,12 +20,15 @@ delgroup Delete group from LDAP (requires LDAP admin password)
 deluser Delete user from LDAP (requires LDAP admin password)
 delusergroup Remove user from group in LDAP (requires LDAP admin password)
 fullname Change fullname
-passwd Change password`
+passwd Change password
+```
 
 ## Add user
 
 Add user will create SSHA passwords generated with help of openssl
 
-`salt=head -c 4 /dev/random
+```
+salt=head -c 4 /dev/random
 ssha=echo -n "{np1}{salt}" | openssl dgst -binary -sha1
-encpw=echo -n "{ssha}{salt}" | openssl enc -base64`
+encpw=echo -n "{ssha}{salt}" | openssl enc -base64
+```
